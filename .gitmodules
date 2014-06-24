@@ -1,0 +1,3 @@
+[submodule "parser"]
+	path = parser
+	url = git://github.com/Eluvatar/trawler-parser-python.git

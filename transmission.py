@@ -92,7 +92,7 @@ class Subscriber():
     def offer(self,zsock,event):
         ts = time.time()
         if( self.last_sent is not None and self.last_sent > self.last_ackd and self.last_ackd < ts - 60.0 and self.outq > 10 ):
-            logger.debug("%s timed out from %s",_zaddr_str(self.zaddr),self.regex.pattern)
+            logger.info("%s timed out from %s",_zaddr_str(self.zaddr),self.regex.pattern)
             logger.debug("%f > %f and %f < %f - 60.0 and %d > 10",self.last_sent,self.last_ackd or 0.0,self.last_ackd or 0.0,ts,self.outq)
             root = ET.Element("TIMEOUT")
             root.text = self.regex.pattern
@@ -124,11 +124,12 @@ class Audience:
             zaddr, msg_str = self.zsock.recv_multipart()
             msg = json.loads( msg_str )
             if( 'subscribe' in msg ):
-                logger.debug("%s subscribed to %s",_zaddr_str(zaddr),msg['subscribe'])
+                logger.info("%s subscribed to %s",_zaddr_str(zaddr),msg['subscribe'])
                 subscribers.append(Subscriber(zaddr,re.compile(msg['subscribe'])))
             elif( 'ack' in msg ):
                 acks[zaddr]=msg['ack']
-        if(not quiet):
+        if(not quiet and last_spoke < time.time()-1.0):
+            last_spoke = time.time()
             logger.debug("processing %d subscribers...", len(subscribers))
         for s in subscribers:
             if( s.zaddr in acks ):

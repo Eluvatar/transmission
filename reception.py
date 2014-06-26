@@ -26,6 +26,25 @@ import json
 import time
 import threading
 
+def regexify(event_text):
+    """ Turns strings of the form 
+            "@@(nation)@@ founded the region %%(region)%%." 
+        into
+            r'@@([a-z0-9\_\-]+)@@ founded the region %%([a-z0-9\_])%%\.'
+        does not currently cover any replacements besides nation and region
+        identifiers. (I.E. resolution names, nation titles, nation classes...)
+    """
+    # TODO support more substitutions
+    replaced = event_text
+    filters = [('.','\.'),
+    ("@@(nation)@@","@@([a-z0-9\_\-]+)@@"),
+    ("@@nation@@","@@[a-z0-9\_\-]+@@"),
+    ("%%(region)%%","%%([a-z0-9\_]+)%%"),
+    ("%%region%%","%%[a-z0-9\_]+%%")]
+    for (from_str, to_str) in filters:
+        replaced = replaced.replace(from_str, to_str)
+    return "^{0}$".format(replaced)
+
 def _connect(port):
     url = "tcp://localhost:{0}".format(port)
     zsock = zmq.Context.instance().socket(zmq.DEALER)
@@ -37,18 +56,27 @@ def oneshot(regex, port=6261):
     zsock.send(json.dumps({'subscribe':regex}))
     return zsock.recv()
 
-def subscribe(regex, callback, port=6261):
+def subscribe_pattern(pattern, callback=None, port=6261):
+    return subscribe(regexify(pattern), callback, port)
+
+def subscribe(regex, callback=None, port=6261):
     if regex is type(re.compile('')):
         regex_re = regex
         regex_str = regex.pattern
     else:
+        # TODO may need correction for unicode support
         regex_str = str(regex)
         regex_re = re.compile(regex_str)
     name = "Transmission Reception of {0}".format(regex_str)
-    args = (regex_re,regex_str,callback, port)
-    worker = threading.Thread(target=_subscribe, name=name, args=args)
-    worker.daemon = True
-    worker.start()
+    def inner(callback):
+        args = (regex_re,regex_str,callback, port)
+        worker = threading.Thread(target=_subscribe, name=name, args=args)
+        worker.daemon = True
+        worker.start()
+    if( callback ):
+        inner(callback)
+    else:
+        return inner
 
 def _subscribe(regex_re, regex_str, callback, port):
     zsock = _connect(port)

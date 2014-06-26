@@ -20,11 +20,12 @@ import reception
 import xml.etree.ElementTree as ET
 
 out=open("happenings.xml","a")
-def __cb(xml):
+
+@reception.subscribe(".*")
+def print_text_and_log_xml(xml):
     print xml.find("TEXT").text
     print >> out, ET.tostring(xml)
 
-reception.subscribe(".*",__cb)
 import time
 while(True):
     time.sleep(600.0)
@@ -34,7 +35,7 @@ while(True):
 ### Watcher of movement / WA membership happenings
 ```python
 import reception
-def __cb(xml):
+def print_event_text(xml):
     print xml.find("TEXT").text
 
 EVENTS = ["@@nation@@ founded the region %%region%%.",
@@ -46,15 +47,8 @@ EVENTS = ["@@nation@@ founded the region %%region%%.",
 "@@nation@@ resigned from the World Assembly.",
 "@@nation@@ was ejected from the WA for rule violations."]
 
-filters = [('.','\.'),
-("@@nation@@","@@[a-z0-9\_\-]+@@"),
-("%%region%%","%%[a-z0-9\_]+%%")]
 for desc in EVENTS:
-    replaced = desc
-    for (from_str,to_str) in filters:
-        replaced = replaced.replace(from_str,to_str)
-    regex = "^"+replaced+"$"
-    reception.subscribe(regex,__cb)
+    reception.subscribe_pattern(desc,print_event_text)
 
 import time
 while(True):

@@ -114,8 +114,10 @@ class Audience:
         self.zsock = zmq.Context.instance().socket(zmq.ROUTER)
         self.zsock.bind(url)
         self.subscribers = list()
+        self.last_spoke = None
     
     def offer(self,event):
+        last_spoke = self.last_spoke
         subscribers = self.subscribers
         acks = dict()
         quiet = True
@@ -129,7 +131,7 @@ class Audience:
             elif( 'ack' in msg ):
                 acks[zaddr]=msg['ack']
         if(not quiet and last_spoke < time.time()-1.0):
-            last_spoke = time.time()
+            self.last_spoke = time.time()
             logger.debug("processing %d subscribers...", len(subscribers))
         for s in subscribers:
             if( s.zaddr in acks ):

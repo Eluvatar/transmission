@@ -43,7 +43,7 @@ def regexify(event_text):
     for (from_str, to_str) in filters:
         replaced = replaced.replace(from_str, to_str)
     replaced = re.sub(r'\.$','\.')
-    return "^{0}$".format(replaced)
+    return re.compile("^{0}$".format(replaced))
 
 def _connect(port):
     url = "tcp://localhost:{0}".format(port)

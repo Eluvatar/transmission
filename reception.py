@@ -36,13 +36,13 @@ def regexify(event_text):
     """
     # TODO support more substitutions
     replaced = event_text
-    filters = [('.','\.'),
-    ("@@(nation)@@","@@([a-z0-9\_\-]+)@@"),
+    filters = [("@@(nation)@@","@@([a-z0-9\_\-]+)@@"),
     ("@@nation@@","@@[a-z0-9\_\-]+@@"),
     ("%%(region)%%","%%([a-z0-9\_]+)%%"),
     ("%%region%%","%%[a-z0-9\_]+%%")]
     for (from_str, to_str) in filters:
         replaced = replaced.replace(from_str, to_str)
+    replaced = re.sub(r'\.$','\.')
     return "^{0}$".format(replaced)
 
 def _connect(port):

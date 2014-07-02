@@ -63,13 +63,11 @@ import threading.Event
 done = Event()
 watchlist = frozenset('testlandia','salusasecondus','pythagosaurus')
 
-on_ejected.pattern = \
-"@@(nation)@@ was ejected( and banned)? from %%region%% by @@(nation)@@."
-@reception.subscribe
+@reception.subscribe(pattern="@@(nation)@@ was ejected( and banned)? from %%region%% by @@(nation)@@.") 
 def on_ejected(event):
     text = event.text
-    if match.group(1) in watchlist:
-        print "{0} has 'won' nationstates!".format(match.group(2))
+    if event.group(1) in watchlist:
+        print "{0} has 'won' nationstates!".format(event.group(2))
         done.set()
 
 done.wait()

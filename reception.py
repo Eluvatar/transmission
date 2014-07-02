@@ -42,7 +42,7 @@ def regexify(event_text):
     ("%%region%%","%%[a-z0-9\_]+%%")]
     for (from_str, to_str) in filters:
         replaced = replaced.replace(from_str, to_str)
-    replaced = re.sub(r'\.$','\.')
+    replaced = re.sub(r'\.$', '\.', replaced)
     return re.compile("^{0}$".format(replaced))
 
 def _connect(port):
@@ -56,25 +56,33 @@ def oneshot(regex, port=6261):
     zsock.send(json.dumps({'subscribe':regex}))
     return zsock.recv()
 
-def subscribe_pattern(pattern, callback=None, port=6261):
-    return subscribe(regexify(pattern), callback, port)
-
-def subscribe(regex, callback=None, port=6261):
-    if regex is type(re.compile('')):
-        regex_re = regex
-        regex_str = regex.pattern
-    else:
-        # TODO may need correction for unicode support
-        regex_str = str(regex)
-        regex_re = re.compile(regex_str)
-    name = "Transmission Reception of {0}".format(regex_str)
+def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, port=6261):
     def inner(callback):
+        if not callable(regex_or_callback) and not regex_or_callback is None:
+            regex = regex_or_callback
+        elif 'regex' not in locals():
+            regex = None
+        if not regex:
+            if pattern:
+                regex = regexify(pattern)
+            else:
+                raise ValueError("Must specify a pattern or regex!")
+        if isinstance(regex, type(re.compile(''))):
+            regex_re = regex
+            regex_str = regex.pattern
+        else:
+            # TODO may need correction for unicode support
+            regex_str = str(regex)
+            regex_re = re.compile(regex_str)
+        name = "Transmission Reception of {0}".format(regex_str)
         args = (regex_re,regex_str,callback, port)
         worker = threading.Thread(target=_subscribe, name=name, args=args)
         worker.daemon = True
         worker.start()
     if( callback ):
         inner(callback)
+    elif( callable(regex_or_callback) ):
+        inner(regex_or_callback)
     else:
         return inner
 
@@ -91,8 +99,13 @@ def _subscribe(regex_re, regex_str, callback, port):
         if( xml.tag == "TIMEOUT" ):
             timed_out = True
             print "timed_out {0}".format(regex_str)
-        elif( regex_re.search(xml.find("TEXT").text) ):
-            callback(xml)
-            zsock.send(acks)
         else:
-            zsock.send(acks)
+            match = regex_re.search(xml.find("TEXT").text)
+            if match:
+                xml.group = match.group
+                xml.groups = match.groups
+                xml.timestamp = int(xml.find("TIMESTAMP").text)
+                callback(xml)
+                zsock.send(acks)
+            else:
+                zsock.send(acks)

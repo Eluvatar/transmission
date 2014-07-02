@@ -54,3 +54,27 @@ import time
 while(True):
     time.sleep(600.0)
 ```
+
+### Ejection notices
+```python
+import reception
+import threading.Event
+
+done = Event()
+watchlist = frozenset('testlandia','salusasecondus','pythagosaurus')
+
+on_ejected.pattern = \
+"@@(nation)@@ was ejected( and banned)? from %%region%% by @@(nation)@@."
+@reception.subscribe
+def on_ejected(event):
+    text = event.text
+    if match.group(1) in watchlist:
+        print "{0} has 'won' nationstates!".format(match.group(2))
+        done.set()
+
+done.wait()
+print "There is no point playing anymore, clearly."
+print "Ejecting an admin has never been done before, ever, I swear."
+```
+
+NB: The above example program lies.

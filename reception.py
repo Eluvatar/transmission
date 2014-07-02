@@ -100,11 +100,13 @@ def _subscribe(regex_re, regex_str, callback, port):
             timed_out = True
             print "timed_out {0}".format(regex_str)
         else:
-            match = regex_re.search(xml.find("TEXT").text)
+            text = xml.find("TEXT").text
+            match = regex_re.search(text)
             if match:
                 xml.group = match.group
                 xml.groups = match.groups
                 xml.timestamp = int(xml.find("TIMESTAMP").text)
+                xml.text = text
                 callback(xml)
                 zsock.send(acks)
             else:

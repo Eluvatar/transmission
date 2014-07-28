@@ -92,14 +92,25 @@ def _subscribe(regex_re, regex_str, callback, port):
     print "sub = {0}".format(sub)
     zsock.send(sub)
     timed_out = False
-    while( not timed_out ):
+    while( True ):
+        if( timed_out ):
+            if( 0 == zsock.poll(60000) ):
+                return
         s = zsock.recv()
         xml = ET.fromstring(s)
         acks = json.dumps({'ack':time.time()})
-        if( xml.tag == "TIMEOUT" ):
+        if( xml.tag == "SUBSCRIBED" ):
+            if( xml.text != regex_str ):
+                print "bad subscription! {0} != {1}".format(xml.text, regex_str)
+                return
+            timed_out = False
+        elif( xml.tag == "TIMEOUT" ):
             timed_out = True
+            # TODO log properly
             print "timed_out {0}".format(regex_str)
+            zsock.send(sub)
         else:
+            timed_out = 0
             text = xml.find("TEXT").text
             match = regex_re.search(text)
             if match:

@@ -116,6 +116,11 @@ class Audience:
         self.subscribers = list()
         self.last_spoke = None
     
+    def subscribed_message(self, regex_str):
+        root = ET.Element("SUBSCRIBED")
+        root.text = regex_str
+        zsock.send_multipart((self.zaddr,ET.tostring(root)))
+    
     def offer(self,event):
         last_spoke = self.last_spoke
         subscribers = self.subscribers
@@ -128,6 +133,7 @@ class Audience:
             if( 'subscribe' in msg ):
                 logger.info("%s subscribed to %s",_zaddr_str(zaddr),msg['subscribe'])
                 subscribers.append(Subscriber(zaddr,re.compile(msg['subscribe'])))
+                self.subscribed_message(msg['subscribe'])
             elif( 'ack' in msg ):
                 acks[zaddr]=msg['ack']
         if(not quiet and last_spoke < time.time()-1.0):

@@ -35,6 +35,13 @@ logger.setLevel(logging.DEBUG)
 def _user_agent(user):
     api.user_agent = "Transmission v0.1.0 ({0})".format(user)
 
+def eventrange_s(lastevent):
+    sinceid_s = lastevent.get("id")
+    sinceid = int(sinceid_s)
+    beforeid = sinceid+100
+    beforeid_s = str(beforeid)
+    return (sinceid_s, beforeid_s)
+
 def loop(user,port,logLevel=logging.DEBUG):
     logger.setLevel(logLevel)
     audience = Audience(port)
@@ -42,7 +49,7 @@ def loop(user,port,logLevel=logging.DEBUG):
     xml = api.request({'q':'happenings'})
     last = time.time()
     lastevent = xml.find("HAPPENINGS").find("EVENT")
-    sinceid_s = lastevent.get("id")
+    sinceid_s, beforeid_s = eventrange_s( lastevent )
     wave(xml, audience)
     consecutive_empty = 0
     while True:
@@ -51,10 +58,14 @@ def loop(user,port,logLevel=logging.DEBUG):
         logger.debug("sleeping %fs...", tosleep)
         time.sleep(tosleep)
         last = time.time()
-        xml = api.request({'q':'happenings','sinceid':sinceid_s})
+        xml = api.request({
+            'q':'happenings',
+            'sinceid':sinceid_s,
+            'beforeid':beforeid_s
+        })
         lastevent = xml.find("HAPPENINGS").find("EVENT")
         if lastevent is not None:
-            sinceid_s = lastevent.get("id")
+            sinceid_s, beforeid_s = eventrange_s(lastevent)
             wave(xml, audience)
             consecutive_empty = 0
         else:
@@ -62,6 +73,7 @@ def loop(user,port,logLevel=logging.DEBUG):
         if( consecutive_empty > 90 ):
             logger.warn("resetting sinceid!")
             sinceid_s = "0"
+            beforeid_s = ""
 
 def wave(xml,audience):
     events = xml.find("HAPPENINGS").findall("EVENT")
@@ -119,7 +131,7 @@ class Audience:
     def subscribed_message(self, regex_str):
         root = ET.Element("SUBSCRIBED")
         root.text = regex_str
-        zsock.send_multipart((self.zaddr,ET.tostring(root)))
+        self.zsock.send_multipart((self.zaddr,ET.tostring(root)))
     
     def offer(self,event):
         last_spoke = self.last_spoke

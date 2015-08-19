@@ -26,6 +26,8 @@ import json
 import time
 import threading
 
+from parser import api
+
 def regexify(event_text):
     """ Turns strings of the form 
             "@@(nation)@@ founded the region %%(region)%%." 
@@ -56,7 +58,7 @@ def oneshot(regex, port=6261):
     zsock.send(json.dumps({'subscribe':regex}))
     return zsock.recv()
 
-def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, port=6261):
+def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, port=6261, from_event_id=None):
     def inner(callback):
         if not callable(regex_or_callback) and not regex_or_callback is None:
             regex = regex_or_callback
@@ -75,7 +77,7 @@ def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, p
             regex_str = str(regex)
             regex_re = re.compile(regex_str)
         name = "Transmission Reception of {0}".format(regex_str)
-        args = (regex_re,regex_str,callback, port)
+        args = (regex_re,regex_str,callback, port, from_event_id)
         worker = threading.Thread(target=_subscribe, name=name, args=args)
         worker.daemon = True
         worker.start()
@@ -86,7 +88,7 @@ def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, p
     else:
         return inner
 
-def _subscribe(regex_re, regex_str, callback, port):
+def _subscribe(regex_re, regex_str, callback, port, from_event_id):
     zsock = _connect(port)
     sub = json.dumps({'subscribe':regex_str})
     print "sub = {0}".format(sub)
@@ -111,14 +113,34 @@ def _subscribe(regex_re, regex_str, callback, port):
             zsock.send(sub)
         else:
             timed_out = 0
-            text = xml.find("TEXT").text
-            match = regex_re.search(text)
-            if match:
-                xml.group = match.group
-                xml.groups = match.groups
-                xml.timestamp = int(xml.find("TIMESTAMP").text)
-                xml.text = text
-                callback(xml)
-                zsock.send(acks)
-            else:
-                zsock.send(acks)
+            zsock.send(acks)
+            if( from_event_id is not None ):
+                event_id = int(xml.get("id"))
+                if event_id > from_event_id:
+                    _catchup(from_event_id, event_id, regex_re, callback)
+                    from_event_id = None
+            _receive(xml, regex_re, callback) 
+
+def _catchup(from_event_id, event_id, regex_re, callback):
+    for i in range(from_event_id, event_id, 100):
+       xml = api.request({
+           'q':'happenings',
+           'sinceid':str(i),
+           'beforeid':str(min(i+101,event_id))
+       })
+       events = xml.find("HAPPENINGS").findall("EVENT")
+       events.reverse()
+       for event in events:
+           if regex_re.match(event.find("TEXT").text):
+               _receive(event, regex_re, callback)
+
+def _receive(xml, regex_re, callback):
+    text = xml.find("TEXT").text
+    match = regex_re.search(text)
+    if match:
+        xml.group = match.group
+        xml.groups = match.groups
+        xml.timestamp = int(xml.find("TIMESTAMP").text)
+        xml.text = text
+        callback(xml)
+

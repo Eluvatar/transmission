@@ -52,13 +52,15 @@ def loop(user,port,logLevel=logging.DEBUG):
     if lastevent is None:
         raise "No happenings available -- NS is down?"
     sinceid_s, beforeid_s = eventrange_s( lastevent )
-    wave(xml, audience)
+    events = xml.find("HAPPENINGS").findall("EVENT")
+    wave(events, audience)
     consecutive_empty = 0
     while True:
-        ts = time.time()
-        tosleep = max(2.0 - (ts - last),0)
-        logger.debug("sleeping %fs...", tosleep)
-        time.sleep(tosleep)
+        if len(events) < 100:
+            ts = time.time()
+            tosleep = max(2.0 - (ts - last),0)
+            logger.debug("sleeping %fs...", tosleep)
+            time.sleep(tosleep)
         last = time.time()
         xml = api.request({
             'q':'happenings',
@@ -66,9 +68,10 @@ def loop(user,port,logLevel=logging.DEBUG):
             'beforeid':beforeid_s
         })
         lastevent = xml.find("HAPPENINGS").find("EVENT")
+        events = xml.find("HAPPENINGS").findall("EVENT")
         if lastevent is not None:
             sinceid_s, beforeid_s = eventrange_s(lastevent)
-            wave(xml, audience)
+            wave(events, audience)
             consecutive_empty = 0
         else:
             consecutive_empty += 1
@@ -77,8 +80,7 @@ def loop(user,port,logLevel=logging.DEBUG):
             sinceid_s = "0"
             beforeid_s = ""
 
-def wave(xml,audience):
-    events = xml.find("HAPPENINGS").findall("EVENT")
+def wave(events,audience):
     events.reverse()
     logger.debug("processing %d events...", len(events))
     for event in events:

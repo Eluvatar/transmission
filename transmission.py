@@ -49,6 +49,8 @@ def loop(user,port,logLevel=logging.DEBUG):
     xml = api.request({'q':'happenings'})
     last = time.time()
     lastevent = xml.find("HAPPENINGS").find("EVENT")
+    if lastevent is None:
+        raise "No happenings available -- NS is down?"
     sinceid_s, beforeid_s = eventrange_s( lastevent )
     wave(xml, audience)
     consecutive_empty = 0
@@ -128,10 +130,10 @@ class Audience:
         self.subscribers = list()
         self.last_spoke = None
     
-    def subscribed_message(self, regex_str):
+    def subscribed_message(self, zaddr, regex_str):
         root = ET.Element("SUBSCRIBED")
         root.text = regex_str
-        self.zsock.send_multipart((self.zaddr,ET.tostring(root)))
+        self.zsock.send_multipart((zaddr,ET.tostring(root)))
     
     def offer(self,event):
         last_spoke = self.last_spoke
@@ -145,7 +147,7 @@ class Audience:
             if( 'subscribe' in msg ):
                 logger.info("%s subscribed to %s",_zaddr_str(zaddr),msg['subscribe'])
                 subscribers.append(Subscriber(zaddr,re.compile(msg['subscribe'])))
-                self.subscribed_message(msg['subscribe'])
+                self.subscribed_message(zaddr, msg['subscribe'])
             elif( 'ack' in msg ):
                 acks[zaddr]=msg['ack']
         if(not quiet and last_spoke < time.time()-1.0):

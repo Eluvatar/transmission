@@ -42,7 +42,7 @@ def eventrange_s(lastevent):
     beforeid_s = str(beforeid)
     return (sinceid_s, beforeid_s)
 
-def loop(user,port,logLevel=logging.DEBUG):
+def loop(user,port,logLevel=logging.DEBUG,period=2.0):
     logger.setLevel(logLevel)
     audience = Audience(port)
     _user_agent(user)
@@ -58,7 +58,7 @@ def loop(user,port,logLevel=logging.DEBUG):
     while True:
         if len(events) < 100:
             ts = time.time()
-            tosleep = max(2.0 - (ts - last),0)
+            tosleep = max(period - (ts - last),0)
             logger.debug("sleeping %fs...", tosleep)
             time.sleep(tosleep)
         last = time.time()

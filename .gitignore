@@ -1,1 +1,4 @@
 *.pyc
+happenings.xml
+.*.swp
+*~

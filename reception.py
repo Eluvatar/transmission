@@ -152,6 +152,7 @@ class Event(object):
         self.groups = None
         self.timestamp = None
         self.text = None
+        self.id = None
 
 def _receive(xml, regex_re, callback, callback_arg_type):
     text = xml.find("TEXT").text
@@ -161,6 +162,7 @@ def _receive(xml, regex_re, callback, callback_arg_type):
             res = xml
         elif( callback_arg_type == "object" ):
             res = Event()
+            res.id = int(xml.get("id"))
         res.group = match.group
         res.groups = match.groups
         res.timestamp = int(xml.find("TIMESTAMP").text)

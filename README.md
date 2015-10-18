@@ -6,11 +6,8 @@ nationstates happenings subscription system
 ## Examples
 
 ### Transmission Daemon
-```python
-import transmission, logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-transmission.loop(user=YOUR_NATION_NAME_OR_URL_OR_EMAIL_OR_SOMETHING,port=6261)
+```bash
+./transmission_runner.py -u YOUR_NATION_NAME_OR_URL_OR_EMAIL_OR_SOMETHING
 ```
 The `user` argument should satisfy [the API terms of use](http://www.nationstates.net/pages/api.html#terms), and is required.
  

@@ -25,6 +25,7 @@ import re
 import json
 import time
 import threading
+import Queue
 
 from parser import api
 
@@ -94,6 +95,10 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
     print "sub = {0}".format(sub)
     zsock.send(sub)
     timed_out = False
+    queue = Queue.Queue()
+    worker = threading.Thread(target=_worker, name="Transmission Reception Worker of {0}".format(regex_str), args=(queue,))
+    worker.daemon = True
+    worker.start()
     while( True ):
         if( timed_out ):
             if( 0 == zsock.poll(60000) ):
@@ -117,9 +122,17 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
             if( from_event_id is not None ):
                 event_id = int(xml.get("id"))
                 if event_id > from_event_id:
-                    _catchup(from_event_id, event_id, regex_re, callback, callback_arg_type)
+                    _enqueue(queue,_catchup,(from_event_id, event_id, regex_re, callback, callback_arg_type))
                     from_event_id = None
-            _receive(xml, regex_re, callback, callback_arg_type) 
+            _enqueue(queue,_receive,(xml, regex_re, callback, callback_arg_type))
+
+def _enqueue(queue, fn, args):
+    queue.put((fn,args))
+
+def _worker(queue):
+    while( True):
+        fn, args = queue.get()
+        fn(*args)
 
 def _catchup(from_event_id, event_id, regex_re, callback, callback_arg_type):
     for i in range(from_event_id, event_id, 100):

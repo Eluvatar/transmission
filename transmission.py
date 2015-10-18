@@ -1,4 +1,4 @@
-#    Copyright 2014 Eluvatar
+#    Copyright 2014-2015 Eluvatar
 #
 #    This file is part of Transmission.
 #
@@ -20,6 +20,7 @@
     seconds and notifies subscribers of happenings that match their regexes
 """
 
+import parser.client.trawler as trawler
 import parser.api as api
 import xml.etree.ElementTree as ET
 import zmq
@@ -33,7 +34,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 def _user_agent(user):
-    api.user_agent = "Transmission v0.1.0 ({0})".format(user)
+    api.user_agent = _user_agent_str(user)
+
+def _user_agent_str(user):
+    return "Transmission v0.1.0 ({0})".format(user)
 
 def eventrange_s(lastevent):
     sinceid_s = lastevent.get("id")
@@ -67,7 +71,8 @@ def loop(user,port,logLevel=logging.DEBUG,period=2.0):
             'sinceid':sinceid_s,
             'beforeid':beforeid_s
         })
-        lastevent = xml.find("HAPPENINGS").find("EVENT")
+        happenings = xml.find("HAPPENINGS")
+        lastevent = happenings.find("EVENT")
         events = xml.find("HAPPENINGS").findall("EVENT")
         if lastevent is not None:
             sinceid_s, beforeid_s = eventrange_s(lastevent)
@@ -85,7 +90,6 @@ def wave(events,audience):
     logger.debug("processing %d events...", len(events))
     for event in events:
         audience.offer(event)
-    
 
 def _zaddr_str(zaddr):
     try:

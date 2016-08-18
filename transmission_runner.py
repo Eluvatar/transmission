@@ -32,8 +32,9 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Observe happenings")
 parser.add_argument('-u','--user', required=True, help='a nation name, email, or web page to identify the user as per item 1 of the NS API Terms of Use: http://www.nationstates.net/pages/api.html#terms')
-parser.add_argument('-p','--port', help='the port number on which to listen for subscribers (default=6261)', default=6161)
+parser.add_argument('-p','--port', help='the port number on which to listen for subscribers (default=6261)', default=6261)
 parser.add_argument('--period', type=float, help='a period in seconds between checks of the world happenings feed. 3.0 by default.', default=3.0)
+parser.add_argument('-n','--no_reset', action='store_true', help='Do not reset event id after 90 iterations without higher ID events', default=False)
 args = parser.parse_args()
 
-transmission.loop(args.user,args.port,period=args.period)
+transmission.loop(args.user,args.port,period=args.period,no_reset=args.no_reset)

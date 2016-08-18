@@ -39,28 +39,37 @@ def _user_agent(user):
 def _user_agent_str(user):
     return "Transmission v0.1.0 ({0})".format(user)
 
+def _event_id(event):
+    return event.get("id")
+
 def eventrange_s(lastevent):
-    sinceid_s = lastevent.get("id")
+    sinceid_s = _event_id(lastevent)
     sinceid = int(sinceid_s)
-    beforeid = sinceid+100
+    beforeid = sinceid+201
     beforeid_s = str(beforeid)
     return (sinceid_s, beforeid_s)
 
-def loop(user,port,logLevel=logging.DEBUG,period=2.0):
+def loop(user, port, logLevel=logging.DEBUG, period=2.0, no_reset=False):
     logger.setLevel(logLevel)
     audience = Audience(port)
+    _loop(user, audience, period=period, no_reset=no_reset)
+
+def _loop(user, audience, sinceid=None, period=2.0, no_reset = False):
     _user_agent(user)
-    xml = api.request({'q':'happenings'})
-    last = time.time()
-    lastevent = xml.find("HAPPENINGS").find("EVENT")
-    if lastevent is None:
-        raise "No happenings available -- NS is down?"
-    sinceid_s, beforeid_s = eventrange_s( lastevent )
-    events = xml.find("HAPPENINGS").findall("EVENT")
-    wave(events, audience)
     consecutive_empty = 0
+    if sinceid is None:
+        xml = api.request({'q':'happenings','limit':'200'})
+        last = time.time()
+        lastevent = xml.find("HAPPENINGS").find("EVENT")
+        if lastevent is None:
+            raise "No happenings available -- NS is down?"
+        sinceid_s, beforeid_s = eventrange_s( lastevent )
+        events = xml.find("HAPPENINGS").findall("EVENT")
+        wave(events, audience)
+    else:
+        sinceid_s, beforeid_s = str(sinceid), str(int(sinceid)+201)
     while True:
-        if len(events) < 100:
+        if len(events) < 200:
             ts = time.time()
             tosleep = max(period - (ts - last),0)
             logger.debug("sleeping %fs...", tosleep)
@@ -69,8 +78,9 @@ def loop(user,port,logLevel=logging.DEBUG,period=2.0):
         xml = api.request({
             'q':'happenings',
             'sinceid':sinceid_s,
-            'beforeid':beforeid_s
-        })
+            'beforeid':beforeid_s,
+            'limit':'200',
+        }, retries=10)
         happenings = xml.find("HAPPENINGS")
         lastevent = happenings.find("EVENT")
         events = xml.find("HAPPENINGS").findall("EVENT")
@@ -139,10 +149,12 @@ class Audience:
     def subscribed_message(self, zaddr, regex_str):
         root = ET.Element("SUBSCRIBED")
         root.text = regex_str
+        root.set('last_event_id', self.last_id)
         self.zsock.send_multipart((zaddr,ET.tostring(root)))
     
     def offer(self,event):
         last_spoke = self.last_spoke
+        self.last_id = event.get('id')
         subscribers = self.subscribers
         acks = dict()
         quiet = True

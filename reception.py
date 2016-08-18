@@ -110,6 +110,11 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
             if( xml.text != regex_str ):
                 print "bad subscription! {0} != {1}".format(xml.text, regex_str)
                 return
+            if( xml.get('last_event_id') is not None and from_event_id is not None):
+                last_id = int(xml.get('last_event_id'))
+                if last_id > from_event_id:
+                    _enqueue(queue,_catchup,(from_event_id,last_id,regex_re,callback,callback_arg_type))
+                    from_event_id = None
             timed_out = False
         elif( xml.tag == "TIMEOUT" ):
             timed_out = True
@@ -135,12 +140,14 @@ def _worker(queue):
         fn(*args)
 
 def _catchup(from_event_id, event_id, regex_re, callback, callback_arg_type):
-    for i in range(from_event_id, event_id, 100):
+    for i in range(from_event_id, event_id, 200):
        xml = api.request({
            'q':'happenings',
            'sinceid':str(i),
-           'beforeid':str(min(i+101,event_id))
-       })
+           'beforeid':str(min(i+201,event_id)),
+           'limit':'200'
+       }, retries=10)
+       assert xml is not None, "error getting happenings from %d to %d"%(i, i+201)
        events = xml.find("HAPPENINGS").findall("EVENT")
        events.reverse()
        for event in events:

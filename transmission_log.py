@@ -60,11 +60,14 @@ def xml(event):
 
 if args.auto:
     with open(args.output,'r') as xmlfile:
-        xmlfile.seek(-2,2)
-        while xmlfile.read(1) != b"\n":
-            xmlfile.seek(-2,1)
-        last = xmlfile.readline()
-        args.start = int(ET.fromstring(last).get("id"))
+        try:
+            xmlfile.seek(-2,2)
+            while xmlfile.read(1) != b"\n":
+                xmlfile.seek(-2,1)
+            last = xmlfile.readline()
+            args.start = int(ET.fromstring(last).get("id"))
+        except IOError:
+            pass
 
 @reception.subscribe(pattern=args.event_pattern,port=args.port,from_event_id=args.start)
 def print_text_and_log_xml(e):
@@ -72,6 +75,7 @@ def print_text_and_log_xml(e):
         print e.text
     if args.output:
         print >> out, ET.tostring(xml(e))
+        out.flush()
 
 import time
 while(True):

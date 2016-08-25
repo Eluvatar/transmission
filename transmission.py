@@ -44,6 +44,9 @@ def _event_id(event):
 
 def eventrange_s(lastevent):
     sinceid_s = _event_id(lastevent)
+    return _eventrange_s(sinceid_s)
+
+def _eventrange_s(sinceid_s):
     sinceid = int(sinceid_s)
     beforeid = sinceid+201
     beforeid_s = str(beforeid)

@@ -29,6 +29,9 @@ import Queue
 
 from parser import api
 
+class Unsubscription(Exception):
+    pass
+
 def regexify(event_text):
     """ Turns strings of the form 
             "@@(nation)@@ founded the region %%(region)%%." 
@@ -77,15 +80,27 @@ def subscribe(regex_or_callback=None, regex=None, pattern=None, callback=None, c
             # TODO may need correction for unicode support
             regex_str = str(regex)
             regex_re = re.compile(regex_str)
+        unsubscribed = threading.Event()
+        def unsubscribe():
+            unsubscribed.set()
+        def callback_wrapper(event):
+            if unsubscribed.is_set():
+                return False
+            try:
+                callback(event)
+                return True
+            except Unsubscription:
+                return False
         name = "Transmission Reception of {0}".format(regex_str)
-        args = (regex_re, regex_str, callback, callback_arg_type, port, from_event_id)
+        args = (regex_re, regex_str, callback_wrapper, callback_arg_type, port, from_event_id)
         worker = threading.Thread(target=_subscribe, name=name, args=args)
         worker.daemon = True
         worker.start()
+        return unsubscribe
     if( callback ):
-        inner(callback)
+        return inner(callback)
     elif( callable(regex_or_callback) ):
-        inner(regex_or_callback)
+        return inner(regex_or_callback)
     else:
         return inner
 
@@ -96,10 +111,11 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
     zsock.send(sub)
     timed_out = False
     queue = Queue.Queue()
-    worker = threading.Thread(target=_worker, name="Transmission Reception Worker of {0}".format(regex_str), args=(queue,))
+    done = threading.Event()
+    worker = threading.Thread(target=_worker, name="Transmission Reception Worker of {0}".format(regex_str), args=(queue,done))
     worker.daemon = True
     worker.start()
-    while( True ):
+    while( not done.is_set() ):
         if( timed_out ):
             if( 0 == zsock.poll(60000) ):
                 return
@@ -107,6 +123,7 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
         xml = ET.fromstring(s)
         acks = json.dumps({'ack':time.time()})
         if( xml.tag == "SUBSCRIBED" ):
+            print s
             if( xml.text != regex_str ):
                 print "bad subscription! {0} != {1}".format(xml.text, regex_str)
                 return
@@ -134,10 +151,12 @@ def _subscribe(regex_re, regex_str, callback, callback_arg_type, port, from_even
 def _enqueue(queue, fn, args):
     queue.put((fn,args))
 
-def _worker(queue):
-    while( True):
+def _worker(queue, done):
+    keep_going = True
+    while( keep_going ):
         fn, args = queue.get()
-        fn(*args)
+        keep_going = fn(*args)
+    done.set()
 
 def _catchup(from_event_id, event_id, regex_re, callback, callback_arg_type):
     for i in range(from_event_id, event_id, 200):
@@ -151,7 +170,11 @@ def _catchup(from_event_id, event_id, regex_re, callback, callback_arg_type):
        events = xml.find("HAPPENINGS").findall("EVENT")
        events.reverse()
        for event in events:
-           _receive(event, regex_re, callback, callback_arg_type)
+           if _receive(event, regex_re, callback, callback_arg_type):
+               pass
+           else:
+               return False
+       return True
 
 class Event(object):
     def __init__(self):
@@ -174,5 +197,5 @@ def _receive(xml, regex_re, callback, callback_arg_type):
         res.groups = match.groups
         res.timestamp = int(xml.find("TIMESTAMP").text)
         res.text = text
-        callback(res)
+        return callback(res)
 
